@@ -3,6 +3,7 @@
 A knee and ankle rehabilitation prototype. An ESP32 reads an MPU6050 motion sensor strapped to the leg, drives a servo, and streams live data to a browser dashboard. The dashboard shows a 3D model of the leg, counts repetitions, tracks range of motion, and includes a game that is controlled by leg movement.
 
 > **Prototype only.** This is a student research build. It is not a medical device and must not be used on a person without supervision from a qualified clinician, and never without the safety checks described below.
+> **Live Link** https://rajdeepxreal.github.io/Exo-Os/
 
 ## Features
 
