@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exoskeleton Neuro-Rehab OS</title>
+    
+    <!-- External Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --bg-dark: #05050a;
+            --panel-bg: rgba(15, 15, 25, 0.7);
+            --accent-cyan: #06b6d4;
+            --accent-purple: #8b5cf6;
+            --accent-green: #10b981;
+            --accent-amber: #f59e0b;
+        }
+        
+        body { 
+            background-color: var(--bg-dark); 
+            color: #e2e8f0; 
+            font-family: 'Inter', sans-serif;
+            overflow: hidden; 
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(139, 92, 246, 0.05), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(6, 182, 212, 0.05), transparent 25%);
+        }
+        
+        .font-orbitron { font-family: 'Orbitron', sans-serif; }
+        
+        .glass-panel { 
+            background: var(--panel-bg); 
+            border: 1px solid rgba(255, 255, 255, 0.05); 
+            border-radius: 16px; 
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s ease;
+        }
+
+        .glass-panel:hover {
+            border-color: rgba(6, 182, 212, 0.3);
+            box-shadow: 0 4px 30px rgba(6, 182, 212, 0.1);
+        }
+
+        .neon-text-cyan { text-shadow: 0 0 10px rgba(6, 182, 212, 0.7); color: var(--accent-cyan); }
+        .neon-text-purple { text-shadow: 0 0 10px rgba(139, 92, 246, 0.7); color: var(--accent-purple); }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+        ::-webkit-scrollbar-thumb { background: rgba(139, 92, 246, 0.5); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-purple); }
+
+        .nav-item { transition: all 0.2s; border-left: 3px solid transparent; }
+        .nav-item.active { background: linear-gradient(90deg, rgba(6, 182, 212, 0.2) 0%, transparent 100%); border-left-color: var(--accent-cyan); color: white; }
+        
+        .tab-content { display: none; animation: fadeIn 0.4s ease-out forwards; }
+        .tab-content.active { display: block; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 18px; width: 18px; border-radius: 50%;
+            background: var(--accent-cyan); cursor: pointer; margin-top: -6px;
+            box-shadow: 0 0 10px var(--accent-cyan);
+        }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: #1e1e2f; border-radius: 5px; }
+        input[type=radio] { accent-color: var(--accent-cyan); }
+
+        #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 50; display: flex; flex-direction: column; gap: 10px; }
+        .toast { background: rgba(15, 15, 25, 0.9); border-left: 4px solid var(--accent-cyan); padding: 12px 20px; border-radius: 8px; font-size: 14px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); animation: slideIn 0.3s ease-out forwards; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
+</head>
+<body class="flex h-screen w-screen">
+
+    <div id="toast-container"></div>
+
+    <!-- Sidebar Navigation -->
+    <aside class="w-64 glass-panel m-4 flex flex-col z-20 hidden md:flex">
+        <div class="p-6 border-b border-gray-800">
+            <h1 class="font-orbitron font-bold text-xl neon-text-cyan"><i class="fa-solid fa-microchip mr-2"></i>EXO-OS <span class="text-xs text-gray-500 block mt-1 tracking-widest">v3.0 GLOBAL</span></h1>
+        </div>
+        
+        <!-- CALIBRATION BUTTON -->
+        <div class="p-4 border-b border-gray-800">
+            <button id="calibrate-btn" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 px-4 rounded-lg text-sm transition-all shadow-[0_0_15px_rgba(6,182,212,0.3)] flex items-center justify-center gap-2">
+                <i class="fa-solid fa-crosshairs"></i> Calibrate Zero
+            </button>
+            <p class="text-[10px] text-gray-400 text-center mt-2">Rest foot flat before clicking</p>
+        </div>
+        
+        <div class="p-4 flex flex-col gap-2 flex-grow">
+            <button class="nav-item active flex items-center gap-3 p-3 text-gray-400 hover:text-white rounded-r-lg w-full text-left" data-target="tab-overview">
+                <i class="fa-solid fa-chart-pie w-5"></i> System Overview
+            </button>
+            <button class="nav-item flex items-center gap-3 p-3 text-gray-400 hover:text-white rounded-r-lg w-full text-left" data-target="tab-kinematics">
+                <i class="fa-solid fa-person-walking w-5"></i> 3D Kinematics
+            </button>
+            <button class="nav-item flex items-center gap-3 p-3 text-gray-400 hover:text-white rounded-r-lg w-full text-left" data-target="tab-therapy">
+                <i class="fa-solid fa-gamepad w-5"></i> Gamified Therapy
+            </button>
+            <button class="nav-item flex items-center gap-3 p-3 text-gray-400 hover:text-white rounded-r-lg w-full text-left" data-target="tab-hardware">
+                <i class="fa-solid fa-sliders w-5"></i> Motor Control
+            </button>
+        </div>
+
+        <div class="p-6 border-t border-gray-800">
+            <div class="flex items-center gap-3 mb-2">
+                <div id="status-dot" class="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]"></div>
+                <span id="status-text" class="text-xs font-bold text-gray-400 tracking-wider">OFFLINE</span>
+            </div>
+            <p class="text-[10px] text-gray-500 font-mono">WS://10.64.3.92:8765</p>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow p-4 md:py-4 md:pr-4 md:pl-0 h-screen overflow-y-auto">
+        
+        <!-- ================= TAB 1: OVERVIEW ================= -->
+        <section id="tab-overview" class="tab-content active h-full flex flex-col gap-4">
+            <!-- Top Stats Row -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                
+                <div class="glass-panel p-5 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-gray-400 uppercase tracking-wider">Total Reps</p>
+                        <h3 class="text-3xl font-orbitron font-bold text-white mt-1" id="total-reps">0</h3>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400 text-xl mb-2"><i class="fa-solid fa-rotate-right"></i></div>
+                        <!-- RESET BUTTON -->
+                        <button id="reset-reps-btn" class="text-[10px] font-bold text-red-500/70 hover:text-red-400 uppercase tracking-widest transition-all"><i class="fa-solid fa-trash mr-1"></i>Reset</button>
+                    </div>
+                </div>
+
+                <div class="glass-panel p-5 flex items-center justify-between">
+                    <div><p class="text-xs text-gray-400 uppercase tracking-wider">Max ROM</p><h3 class="text-3xl font-orbitron font-bold text-white mt-1"><span id="max-rom">0</span>°</h3></div>
+                    <div class="w-12 h-12 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400 text-xl"><i class="fa-solid fa-angle-up"></i></div>
+                </div>
+                <div class="glass-panel p-5 flex items-center justify-between">
+                    <div><p class="text-xs text-gray-400 uppercase tracking-wider">Gait Phase</p><h3 class="text-2xl font-orbitron font-bold text-white mt-1" id="current-phase">STAND</h3></div>
+                    <div class="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 text-xl"><i class="fa-solid fa-shoe-prints"></i></div>
+                </div>
+                <div class="glass-panel p-5 flex items-center justify-between">
+                    <div><p class="text-xs text-gray-400 uppercase tracking-wider">Assist Mode</p><h3 class="text-2xl font-orbitron font-bold text-gray-500 mt-1" id="assist-badge">PASSIVE</h3></div>
+                    <div class="w-12 h-12 rounded-full bg-gray-500/20 flex items-center justify-center text-gray-400 text-xl" id="assist-icon"><i class="fa-solid fa-power-off"></i></div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-grow min-h-[300px]">
+                <div class="glass-panel p-5 lg:col-span-2 flex flex-col">
+                    <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4"><i class="fa-solid fa-chart-line mr-2"></i>Range of Motion History</h2>
+                    <div class="flex-grow relative w-full h-full">
+                        <canvas id="romChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="glass-panel p-5 flex flex-col gap-6">
+                    <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-800 pb-2"><i class="fa-solid fa-bolt mr-2"></i>Live Gait Metrics</h2>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1"><span class="text-gray-400">Impact Force (Accel)</span><span id="impact-val" class="font-mono text-red-400">0.0 G</span></div>
+                        <div class="w-full bg-gray-800 rounded-full h-2.5 overflow-hidden">
+                            <div id="impact-bar" class="bg-gradient-to-r from-yellow-500 to-red-500 h-2.5 rounded-full" style="width: 0%; transition: width 0.1s;"></div>
+                        </div>
+                        <p id="impact-event" class="text-center text-red-400 font-bold text-xs h-4 mt-1 uppercase tracking-widest"></p>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1"><span class="text-gray-400">Kinetic Variance (Gyro)</span><span id="variance-val" class="font-mono text-cyan-400">0.0 rad/s</span></div>
+                        <div class="w-full bg-gray-800 rounded-full h-2.5 overflow-hidden">
+                            <div id="variance-bar" class="bg-gradient-to-r from-blue-500 to-cyan-500 h-2.5 rounded-full" style="width: 0%; transition: width 0.1s;"></div>
+                        </div>
+                    </div>
+                    <div class="mt-auto bg-gray-900/50 p-3 rounded-lg border border-gray-800">
+                        <p class="text-[10px] text-gray-500 uppercase mb-1">Repetition Logic</p>
+                        <p class="text-xs text-gray-300">Target > 30° Flexion, Return to < 10°.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= TAB 2: 3D KINEMATICS ================= -->
+        <section id="tab-kinematics" class="tab-content h-full">
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 h-full">
+                <!-- 3D Canvas -->
+                <div class="glass-panel p-4 lg:col-span-3 flex flex-col relative h-[60vh] lg:h-full">
+                    <div class="absolute top-6 left-6 z-10">
+                        <h2 class="text-lg font-orbitron font-bold neon-text-cyan">BIOMECHANICAL TWIN</h2>
+                        <p class="text-xs text-gray-400 tracking-wider">3D HIERARCHICAL LEG MAPPING</p>
+                    </div>
+                    <div id="3d-container" class="w-full flex-grow rounded-lg overflow-hidden bg-gradient-to-b from-[#0a0a1a] to-[#020205]"></div>
+                </div>
+                
+                <!-- Telemetry & Settings -->
+                <div class="glass-panel p-5 flex flex-col gap-4 overflow-y-auto">
+                    <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-800 pb-2"><i class="fa-solid fa-satellite-dish mr-2"></i>Target Joint</h2>
+                    
+                    <!-- Joint Selector -->
+                    <div class="bg-gray-900/50 p-4 rounded-lg border border-cyan-500/30">
+                        <p class="text-xs text-cyan-300 mb-3 uppercase tracking-widest">Map Sensor To:</p>
+                        <div class="flex gap-4">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="joint" value="knee" id="joint-knee" checked>
+                                <span class="text-sm font-semibold text-white">Knee</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="joint" value="ankle" id="joint-ankle">
+                                <span class="text-sm font-semibold text-white">Ankle</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-900/50 p-3 rounded-lg border border-gray-800 font-mono text-sm mt-2">
+                        <p class="text-cyan-400 border-b border-gray-800 pb-1 mb-2">Orientation (Euler)</p>
+                        <div class="flex justify-between"><span>Pitch (X):</span> <span id="pitch-raw" class="text-white">0.00°</span></div>
+                        <div class="flex justify-between"><span>Roll (Z):</span> <span id="roll-raw" class="text-white">0.00°</span></div>
+                    </div>
+
+                    <div class="bg-gray-900/50 p-3 rounded-lg border border-gray-800 font-mono text-xs">
+                        <p class="text-purple-400 border-b border-gray-800 pb-1 mb-2">Raw MPU6050</p>
+                        <p class="text-gray-500 mt-1">Accel [m/s²]</p>
+                        <div class="flex justify-between"><span class="text-red-400">X:</span> <span id="ax-raw">0.0</span></div>
+                        <div class="flex justify-between"><span class="text-green-400">Y:</span> <span id="ay-raw">0.0</span></div>
+                        <div class="flex justify-between"><span class="text-blue-400">Z:</span> <span id="az-raw">0.0</span></div>
+                        <p class="text-gray-500 mt-2">Gyro [rad/s]</p>
+                        <div class="flex justify-between"><span class="text-red-400">X:</span> <span id="gx-raw">0.0</span></div>
+                        <div class="flex justify-between"><span class="text-green-400">Y:</span> <span id="gy-raw">0.0</span></div>
+                        <div class="flex justify-between"><span class="text-blue-400">Z:</span> <span id="gz-raw">0.0</span></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= TAB 3: GAMIFIED THERAPY ================= -->
+        <section id="tab-therapy" class="tab-content h-full">
+            <div class="glass-panel p-6 flex flex-col items-center justify-center h-full max-h-[800px] relative">
+                <div class="w-full max-w-4xl">
+                    <div class="flex justify-between items-end mb-4">
+                        <div>
+                            <h2 class="text-2xl font-orbitron font-bold neon-text-purple">NEURO-GLIDER</h2>
+                            <p class="text-sm text-gray-400">Active ROM Training Module</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xs text-purple-300 uppercase tracking-widest">High Score</p>
+                            <p class="text-2xl font-orbitron font-bold text-white" id="high-score-val">0</p>
+                        </div>
+                    </div>
+                    
+                    <div id="game-container" class="relative w-full aspect-video bg-gray-900 rounded-xl overflow-hidden border-2 border-purple-500/30 shadow-[0_0_30px_rgba(139,92,246,0.1)] flex items-center justify-center">
+                        <canvas id="gameCanvas" class="absolute inset-0 w-full h-full"></canvas>
+                        
+                        <div id="game-overlay" class="absolute inset-0 bg-gray-900/90 backdrop-blur-sm flex flex-col items-center justify-center z-10">
+                            <h2 id="game-title" class="text-5xl font-orbitron font-black text-white mb-2 tracking-widest">READY?</h2>
+                            <p id="game-subtitle" class="text-purple-300 text-lg mb-8">Hold your joint angle to control <span class="text-white font-bold">ALTITUDE</span> and fly through the gates.</p>
+                            <button id="start-game-btn" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-4 px-12 rounded-full text-xl transition-all hover:scale-105 shadow-[0_0_20px_rgba(139,92,246,0.5)]">START THERAPY</button>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between items-center mt-4 bg-gray-900/50 p-4 rounded-xl border border-gray-800">
+                        <div class="w-1/2">
+                            <label class="text-xs font-semibold uppercase tracking-wider text-gray-300 flex justify-between mb-2">
+                                <span>Game Speed</span>
+                                <span id="speed-val-display" class="text-purple-400 font-bold">Normal (2)</span>
+                            </label>
+                            <input id="game-speed-slider" type="range" min="1" max="15" value="2">
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xl font-orbitron font-bold text-purple-400">Score: <span id="score-val" class="text-white">0</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= TAB 4: HARDWARE CONTROL ================= -->
+        <section id="tab-hardware" class="tab-content h-full">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto h-full items-start">
+                <div class="glass-panel p-8 rounded-2xl relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-6 opacity-10 text-6xl"><i class="fa-solid fa-robot"></i></div>
+                    <h2 class="text-2xl font-orbitron font-bold text-amber-400 mb-2 border-b border-gray-700 pb-4">Manual Override</h2>
+                    <p class="text-sm text-gray-400 mb-8">Direct PWM injection to the physical servo motor.</p>
+                    
+                    <div class="mb-10">
+                        <div class="flex justify-between items-end mb-3">
+                            <label class="text-sm font-semibold uppercase tracking-wider text-gray-300">Target Assist Angle</label>
+                            <span class="font-orbitron font-bold text-amber-400 text-3xl"><span id="angle-display">0</span>°</span>
+                        </div>
+                        <input id="angle-slider" type="range" min="0" max="180" value="0">
+                        <div class="flex justify-between text-xs text-gray-500 mt-2 font-mono"><span>0° (REST)</span><span>180° (MAX)</span></div>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between items-end mb-3">
+                            <label class="text-sm font-semibold uppercase tracking-wider text-gray-300">Motor Speed Delay</label>
+                            <span class="font-orbitron font-bold text-cyan-400 text-3xl"><span id="speed-display">15</span><span class="text-sm">ms</span></span>
+                        </div>
+                        <input id="speed-slider" type="range" min="0" max="60" value="15">
+                        <div class="flex justify-between text-xs text-gray-500 mt-2 font-mono"><span>FAST (0ms)</span><span>SLOW (60ms)</span></div>
+                    </div>
+                </div>
+
+                <div class="glass-panel p-8 rounded-2xl border-l-4 border-l-purple-500">
+                    <h2 class="text-2xl font-orbitron font-bold text-purple-400 mb-2 border-b border-gray-700 pb-4">AI Active Assist</h2>
+                    <p class="text-sm text-gray-400 mb-6">Let the system automate motor control based on intention detection.</p>
+                    
+                    <div class="bg-gray-900/60 p-5 rounded-xl border border-gray-800 mb-6 flex items-center justify-between">
+                        <div>
+                            <h3 class="font-bold text-white mb-1">Assist Mode</h3>
+                            <p class="text-xs text-gray-400">Auto-triggers servo when flexion intent is detected.</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="assist-toggle" class="sr-only peer">
+                            <div class="w-14 h-7 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600 shadow-inner"></div>
+                        </label>
+                    </div>
+
+                    <div class="space-y-4 opacity-50 transition-opacity" id="assist-settings">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Trigger Threshold (Pitch)</label>
+                            <select class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-purple-500 focus:border-purple-500 p-2.5 outline-none">
+                                <option>High Sensitivity (> 15°)</option>
+                                <option selected>Medium Sensitivity (> 25°)</option>
+                                <option>Low Sensitivity (> 40°)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Assist Power (Angle)</label>
+                            <select class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-purple-500 focus:border-purple-500 p-2.5 outline-none">
+                                <option>Gentle Assist (30°)</option>
+                                <option selected>Standard Assist (45°)</option>
+                                <option>Maximum Assist (90°)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ================= JAVASCRIPT LOGIC ================= -->
+    <script>
+        const UIManager = {
+            init() {
+                // Tab Logic
+                document.querySelectorAll('.nav-item').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+                        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                        
+                        const targetBtn = e.currentTarget;
+                        targetBtn.classList.add('active');
+                        document.getElementById(targetBtn.dataset.target).classList.add('active');
+                        
+                        if(targetBtn.dataset.target === 'tab-kinematics') window.dispatchEvent(new Event('resize'));
+                        if(targetBtn.dataset.target === 'tab-therapy') GameManager.resize();
+                    });
+                });
+
+                // Load Memory
+                document.getElementById('total-reps').textContent = localStorage.getItem('exo_reps') || 0;
+                document.getElementById('high-score-val').textContent = localStorage.getItem('exo_highscore') || 0;
+
+                // Reset Button Logic
+                document.getElementById('reset-reps-btn').addEventListener('click', () => {
+                    localStorage.setItem('exo_reps', 0);
+                    BiomechanicsManager.reps = 0;
+                    BiomechanicsManager.maxRom = 0;
+                    document.getElementById('total-reps').textContent = 0;
+                    document.getElementById('max-rom').textContent = 0;
+                    
+                    if (ChartManager.chart) {
+                        ChartManager.chart.data.labels = [];
+                        ChartManager.chart.data.datasets[0].data = [];
+                        ChartManager.chart.update();
+                    }
+                    this.showToast('Therapy memory wiped clean', 'info');
+                });
+            },
+            showToast(message, type="info") {
+                const container = document.getElementById('toast-container');
+                const toast = document.createElement('div');
+                toast.className = `toast border-l-${type === 'error' ? 'red-500' : type === 'success' ? 'green-500' : 'cyan-500'}`;
+                toast.innerHTML = `<i class="fa-solid ${type === 'error' ? 'fa-triangle-exclamation' : type === 'success' ? 'fa-check-circle' : 'fa-info-circle'} mr-2"></i> ${message}`;
+                container.appendChild(toast);
+                setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
+            }
+        };
+
+        const WSManager = {
+            socket: null,
+            isConnected: false,
+            init() { this.connect(); },
+            connect() {
+                const host = '10.196.249.92';
+                this.socket = new WebSocket(`ws://${host}:8765`);
+                const dot = document.getElementById('status-dot');
+                const text = document.getElementById('status-text');
+
+                this.socket.onopen = () => {
+                    this.isConnected = true;
+                    dot.className = 'w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981]';
+                    text.textContent = 'SYSTEM ONLINE';
+                    text.className = 'text-xs font-bold text-emerald-400 tracking-wider';
+                    UIManager.showToast('Hardware Connected', 'success');
+                };
+
+                this.socket.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        BiomechanicsManager.processData(data);
+                    } catch (e) { }
+                };
+
+                this.socket.onclose = () => {
+                    if (this.isConnected) UIManager.showToast('Connection to Hardware Lost', 'error');
+                    this.isConnected = false;
+                    dot.className = 'w-3 h-3 rounded-full bg-red-500 shadow-[0_0_10px_#ef4444]';
+                    text.textContent = 'SYSTEM OFFLINE';
+                    text.className = 'text-xs font-bold text-red-500 tracking-wider';
+                    setTimeout(() => this.connect(), 2000); 
+                };
+            },
+            send(command) {
+                if (this.isConnected && this.socket.readyState === WebSocket.OPEN) {
+                    this.socket.send(command);
+                }
+            }
+        };
+
+        const BiomechanicsManager = {
+            pitchDeg: 0, rollDeg: 0, 
+            rawPitch: 0, rawRoll: 0,
+            pitchOffset: 0, rollOffset: 0,
+            reps: parseInt(localStorage.getItem('exo_reps') || 0),
+            inFlexion: false, maxRom: 0, gyroBuffer: [],
+            
+            init() {
+                // Calibration Logic
+                document.getElementById('calibrate-btn').addEventListener('click', () => {
+                    this.pitchOffset = this.rawPitch;
+                    this.rollOffset = this.rawRoll;
+                    UIManager.showToast('Sensor Calibrated to Neutral Zero', 'success');
+                });
+            },
+
+            processData(data) {
+                if (data.ax === undefined) return;
+
+                document.getElementById('ax-raw').textContent = data.ax.toFixed(2);
+                document.getElementById('ay-raw').textContent = data.ay.toFixed(2);
+                document.getElementById('az-raw').textContent = data.az.toFixed(2);
+                document.getElementById('gx-raw').textContent = data.gx.toFixed(2);
+                document.getElementById('gy-raw').textContent = data.gy.toFixed(2);
+                document.getElementById('gz-raw').textContent = data.gz.toFixed(2);
+
+                // Raw Angles
+                this.rawPitch = Math.atan2(-data.ax, Math.sqrt(data.ay * data.ay + data.az * data.az)) * (180 / Math.PI);
+                this.rawRoll = Math.atan2(data.ay, data.az) * (180 / Math.PI);
+
+                // Apply Calibration Offset
+                let calibratedPitch = this.rawPitch - this.pitchOffset;
+                let calibratedRoll = this.rawRoll - this.rollOffset;
+
+                // Apply Balanced Low-Pass Filter
+                this.pitchDeg = (this.pitchDeg * 0.5) + (calibratedPitch * 0.5);
+                this.rollDeg = (this.rollDeg * 0.5) + (calibratedRoll * 0.5);
+
+                document.getElementById('pitch-raw').textContent = this.pitchDeg.toFixed(2) + '°';
+                document.getElementById('roll-raw').textContent = this.rollDeg.toFixed(2) + '°';
+
+                // Route to 3D Model Joint
+                if (ThreeManager.scene) {
+                    const activeJoint = document.querySelector('input[name="joint"]:checked').value;
+                    if (activeJoint === 'knee') {
+                        ThreeManager.kneePivot.rotation.x = this.pitchDeg * (Math.PI / 180);
+                        ThreeManager.kneePivot.rotation.z = this.rollDeg * (Math.PI / 180);
+                        ThreeManager.anklePivot.rotation.set(0,0,0);
+                    } else if (activeJoint === 'ankle') {
+                        ThreeManager.anklePivot.rotation.x = this.pitchDeg * (Math.PI / 180);
+                        ThreeManager.anklePivot.rotation.z = this.rollDeg * (Math.PI / 180);
+                        ThreeManager.kneePivot.rotation.set(0,0,0);
+                    }
+                }
+
+                this.trackRepetitions(this.pitchDeg);
+                const totalAccel = Math.sqrt(data.ax**2 + data.ay**2 + data.az**2);
+                const totalGyro = Math.sqrt(data.gx**2 + data.gy**2 + data.gz**2);
+                this.analyzeGait(totalAccel, totalGyro);
+                GameManager.handleSensorInput(this.pitchDeg);
+                HardwareManager.checkActiveAssist(this.pitchDeg);
+            },
+
+            trackRepetitions(pitch) {
+                if (pitch > this.maxRom) {
+                    this.maxRom = Math.floor(pitch);
+                    document.getElementById('max-rom').textContent = this.maxRom;
+                }
+                if (pitch > 30 && !this.inFlexion) {
+                    this.inFlexion = true;
+                } else if (pitch < 10 && this.inFlexion) {
+                    this.inFlexion = false;
+                    this.reps++;
+                    document.getElementById('total-reps').textContent = this.reps;
+                    localStorage.setItem('exo_reps', this.reps);
+                    ChartManager.addPoint(this.reps, this.maxRom);
+                    this.maxRom = 0; 
+                    UIManager.showToast('Repetition Completed!', 'success');
+                }
+            },
+
+            analyzeGait(accel, gyro) {
+                const accelGs = accel / 9.81; 
+                document.getElementById('impact-val').textContent = accelGs.toFixed(1) + ' G';
+                document.getElementById('impact-bar').style.width = Math.min(100, (accelGs / 2) * 100) + '%';
+                
+                if (accelGs > 1.8) {
+                    document.getElementById('impact-event').textContent = "HEEL STRIKE DETECTED";
+                    setTimeout(() => document.getElementById('impact-event').textContent = "", 300);
+                }
+
+                this.gyroBuffer.push(gyro);
+                if(this.gyroBuffer.length > 10) this.gyroBuffer.shift();
+                const mean = this.gyroBuffer.reduce((a, b) => a + b, 0) / this.gyroBuffer.length;
+                const variance = this.gyroBuffer.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / this.gyroBuffer.length;
+                
+                document.getElementById('variance-val').textContent = variance.toFixed(2);
+                document.getElementById('variance-bar').style.width = Math.min(100, (variance / 2) * 100) + '%';
+
+                const phaseEl = document.getElementById('current-phase');
+                if (variance > 0.5) {
+                    phaseEl.textContent = "SWING";
+                    phaseEl.className = "text-2xl font-orbitron font-bold text-cyan-400 mt-1";
+                } else {
+                    phaseEl.textContent = "STANCE";
+                    phaseEl.className = "text-2xl font-orbitron font-bold text-white mt-1";
+                }
+            }
+        };
+
+        const HardwareManager = {
+            isAssistActive: false, 
+            assistTriggered: false,
+            lastSentAngle: 0, // Prevents spamming the Wi-Fi network
+
+            init() {
+                // Manual Angle Override
+                document.getElementById('angle-slider').addEventListener('input', (e) => {
+                    if (this.isAssistActive) return; // Block manual slider if AI is driving
+                    const val = e.target.value;
+                    document.getElementById('angle-display').textContent = val;
+                    WSManager.send(`A:${val}`);
+                });
+
+                // Motor Speed Delay
+                document.getElementById('speed-slider').addEventListener('input', (e) => {
+                    const val = e.target.value;
+                    document.getElementById('speed-display').textContent = val;
+                    WSManager.send(`S:${val}`);
+                });
+
+                // Toggle AI Mode
+                document.getElementById('assist-toggle').addEventListener('change', (e) => {
+                    this.isAssistActive = e.target.checked;
+                    const badge = document.getElementById('assist-badge');
+                    const icon = document.getElementById('assist-icon');
+                    if(this.isAssistActive) {
+                        document.getElementById('assist-settings').classList.remove('opacity-50');
+                        badge.textContent = "ACTIVE";
+                        badge.className = "text-2xl font-orbitron font-bold text-purple-400 mt-1";
+                        icon.className = "w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400 text-xl shadow-[0_0_15px_rgba(139,92,246,0.4)]";
+                        UIManager.showToast('Proportional AI Assist Engaged', 'info');
+                    } else {
+                        document.getElementById('assist-settings').classList.add('opacity-50');
+                        badge.textContent = "PASSIVE";
+                        badge.className = "text-2xl font-orbitron font-bold text-gray-500 mt-1";
+                        icon.className = "w-12 h-12 rounded-full bg-gray-500/20 flex items-center justify-center text-gray-400 text-xl";
+                        // Safely park the motor when turned off
+                        WSManager.send('A:0');
+                        document.getElementById('angle-display').textContent = 0;
+                        document.getElementById('angle-slider').value = 0;
+                    }
+                });
+            },
+
+            checkActiveAssist(pitch) {
+                if (!this.isAssistActive) return;
+
+                // 1. Read the LIVE Dropdown UI Settings dynamically
+                const selects = document.querySelectorAll('#assist-settings select');
+                if (selects.length < 2) return;
+                
+                const thresholdStr = selects[0].value; 
+                const powerStr = selects[1].value;     
+
+                // Use RegEx to extract the raw numbers from the dropdown text (15, 25, 40) and (30, 45, 90)
+                const triggerThreshold = parseInt(thresholdStr.match(/\d+/)[0]); 
+                const maxAssistAngle = parseInt(powerStr.match(/\d+/)[0]);      
+
+                // 2. Proportional Phase Tracking
+                if (pitch >= triggerThreshold) {
+                    if (!this.assistTriggered) {
+                        this.assistTriggered = true;
+                        UIManager.showToast('Motor Engaged: Supporting Load', 'success');
+                    }
+
+                    // Amplifies human effort by 1.5x, but caps it at the safety limit set in the dropdown
+                    let calculatedAssist = pitch * 1.5; 
+                    let targetAngle = Math.min(Math.floor(calculatedAssist), maxAssistAngle);
+
+                    // Only send data if the angle has changed enough (smooths out Wi-Fi traffic)
+                    if (Math.abs(targetAngle - this.lastSentAngle) > 2) {
+                        WSManager.send(`A:${targetAngle}`);
+                        document.getElementById('angle-display').textContent = targetAngle;
+                        document.getElementById('angle-slider').value = targetAngle;
+                        this.lastSentAngle = targetAngle;
+                    }
+
+                } 
+                // 3. Hysteresis Buffer
+                // Waits until the leg drops 5 degrees BELOW the threshold before turning off. 
+                // This prevents the motor from rapidly twitching on and off right at the threshold edge.
+                else if (pitch < (triggerThreshold - 5) && this.assistTriggered) {
+                    this.assistTriggered = false;
+                    WSManager.send('A:0');
+                    document.getElementById('angle-display').textContent = 0;
+                    document.getElementById('angle-slider').value = 0;
+                    this.lastSentAngle = 0;
+                }
+            }
+        };
+
+        const ThreeManager = {
+            scene: null, camera: null, renderer: null, 
+            hipPivot: null, kneePivot: null, anklePivot: null,
+            init() {
+                const container = document.getElementById('3d-container');
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 1000);
+                
+                this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+                this.renderer.setSize(container.clientWidth, container.clientHeight);
+                container.appendChild(this.renderer.domElement);
+
+                const grid = new THREE.GridHelper(10, 20, 0x06b6d4, 0x1e1e2f);
+                grid.position.y = -4;
+                this.scene.add(grid);
+
+                // BUILD HIERARCHICAL LEG
+                const matThigh = new THREE.MeshPhongMaterial({ color: 0x334155, shininess: 100 });
+                const matCalf = new THREE.MeshPhongMaterial({ color: 0x06b6d4, shininess: 100 });
+                const matFoot = new THREE.MeshPhongMaterial({ color: 0x8b5cf6, shininess: 100 });
+                const matJoint = new THREE.MeshPhongMaterial({ color: 0xffffff, emissive: 0x333333 });
+
+                this.hipPivot = new THREE.Group();
+                this.hipPivot.position.y = 2; 
+                
+                const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.4, 3, 16), matThigh);
+                thigh.position.y = -1.5; 
+                this.hipPivot.add(thigh);
+
+                this.kneePivot = new THREE.Group();
+                this.kneePivot.position.y = -1.5; 
+                thigh.add(this.kneePivot);
+
+                const kneeJoint = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 16), matJoint);
+                this.kneePivot.add(kneeJoint);
+
+                const calf = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.3, 3, 16), matCalf);
+                calf.position.y = -1.5; 
+                this.kneePivot.add(calf);
+
+                this.anklePivot = new THREE.Group();
+                this.anklePivot.position.y = -1.5;
+                calf.add(this.anklePivot);
+
+                const ankleJoint = new THREE.Mesh(new THREE.SphereGeometry(0.4, 16, 16), matJoint);
+                this.anklePivot.add(ankleJoint);
+
+                const foot = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.4, 1.5), matFoot);
+                foot.position.z = 0.4; 
+                foot.position.y = -0.2;
+                this.anklePivot.add(foot);
+
+                this.scene.add(this.hipPivot);
+
+                const light1 = new THREE.DirectionalLight(0xffffff, 1);
+                light1.position.set(5, 5, 5);
+                this.scene.add(light1);
+                const light2 = new THREE.DirectionalLight(0x8b5cf6, 0.5);
+                light2.position.set(-5, -2, -5);
+                this.scene.add(light2);
+                this.scene.add(new THREE.AmbientLight(0x404040));
+                
+                this.camera.position.set(-5, 0, 7); 
+                this.camera.lookAt(0, -1, 0);
+
+                window.addEventListener('resize', () => {
+                    if(container.clientWidth === 0) return; 
+                    this.renderer.setSize(container.clientWidth, container.clientHeight);
+                    this.camera.aspect = container.clientWidth / container.clientHeight;
+                    this.camera.updateProjectionMatrix();
+                });
+
+                this.animate();
+            },
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                if (!WSManager.isConnected && this.hipPivot) {
+                    this.hipPivot.rotation.y = Math.sin(Date.now() * 0.001) * 0.2;
+                } else if(this.hipPivot) {
+                    this.hipPivot.rotation.y = 0; 
+                }
+                this.renderer.render(this.scene, this.camera);
+            }
+        };
+
+        const GameManager = {
+            canvas: null, ctx: null, container: null,
+            player: { x: 80, y: 0, targetY: 0, size: 15 },
+            gates: [], score: 0, gameActive: false, frameCount: 0,
+            baseSpeed: 2, currentPitch: 0, 
+            
+            init() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.container = document.getElementById('game-container');
+                this.ctx = this.canvas.getContext('2d');
+                
+                const speedSlider = document.getElementById('game-speed-slider');
+                const speedDisplay = document.getElementById('speed-val-display');
+                speedSlider.addEventListener('input', (e) => {
+                    this.baseSpeed = parseInt(e.target.value);
+                    if(this.baseSpeed < 5) speedDisplay.textContent = `Slow (${this.baseSpeed})`;
+                    else if(this.baseSpeed > 10) speedDisplay.textContent = `Fast (${this.baseSpeed})`;
+                    else speedDisplay.textContent = `Normal (${this.baseSpeed})`;
+                });
+
+                window.addEventListener('resize', () => {
+                    if(document.getElementById('tab-therapy').classList.contains('active')) {
+                        this.resize();
+                    }
+                });
+
+                document.getElementById('start-game-btn').addEventListener('click', () => this.start());
+            },
+            resize() {
+                const rect = this.container.getBoundingClientRect();
+                if(rect.width === 0) return; 
+
+                this.canvas.width = rect.width;
+                this.canvas.height = rect.height;
+                this.player.y = this.canvas.height / 2;
+                this.player.targetY = this.canvas.height / 2;
+                
+                if(!this.gameActive) this.drawStatic(); 
+            },
+            start() {
+                this.resize(); 
+                document.getElementById('game-overlay').style.display = 'none';
+                this.gameActive = true;
+                this.score = 0;
+                this.gates = [];
+                this.frameCount = 0;
+                this.currentPitch = 0;
+                document.getElementById('score-val').textContent = 0;
+                this.loop();
+            },
+            end() {
+                this.gameActive = false;
+                const overlay = document.getElementById('game-overlay');
+                overlay.style.display = 'flex';
+                document.getElementById('game-title').textContent = "THERAPY COMPLETE";
+                document.getElementById('game-subtitle').innerHTML = `Final Score: <span class="text-white font-bold">${this.score}</span>`;
+                document.getElementById('start-game-btn').textContent = "RESTART EXERCISE";
+                
+                let high = parseInt(localStorage.getItem('exo_highscore') || 0);
+                if(this.score > high) {
+                    localStorage.setItem('exo_highscore', this.score);
+                    document.getElementById('high-score-val').textContent = this.score;
+                    UIManager.showToast('New High Score!', 'success');
+                }
+            },
+            handleSensorInput(pitchDeg) {
+                this.currentPitch = pitchDeg;
+            },
+            drawStatic() {
+                if(!this.ctx || this.canvas.width === 0) return;
+                this.ctx.fillStyle = '#0f0f19';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                this.ctx.fillStyle = '#06b6d4';
+                this.ctx.beginPath();
+                this.ctx.arc(80, this.canvas.height / 2, 15, 0, Math.PI * 2);
+                this.ctx.fill();
+            },
+            loop() {
+                if (!this.gameActive) return;
+                requestAnimationFrame(() => this.loop());
+
+                this.ctx.fillStyle = '#0f0f19';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                let clampedPitch = Math.max(0, Math.min(45, this.currentPitch)); 
+                let playableHeight = this.canvas.height - 40;
+                let mappedY = playableHeight - ((clampedPitch / 45) * playableHeight) + 20;
+                
+                this.player.targetY = mappedY;
+                this.player.y += (this.player.targetY - this.player.y) * 0.3;
+
+                this.frameCount++;
+                if (this.frameCount % Math.floor(160 - (this.baseSpeed * 2)) === 0) { 
+                    let gapSize = 180; // Very forgiving gap
+                    let gapY = Math.random() * (this.canvas.height - gapSize - 70) + 30;
+                    this.gates.push({ x: this.canvas.width, w: 30, gapTop: gapY, gapBottom: gapY + gapSize, passed: false }); //game controller
+                }
+
+                for (let i = this.gates.length - 1; i >= 0; i--) {
+                    let gate = this.gates[i];
+                    gate.x -= this.baseSpeed; 
+                    
+                    this.ctx.fillStyle = '#ef4444';
+                    this.ctx.shadowBlur = 10;
+                    this.ctx.shadowColor = '#ef4444';
+                    this.ctx.fillRect(gate.x, 0, gate.w, gate.gapTop);
+                    this.ctx.fillRect(gate.x, gate.gapBottom, gate.w, this.canvas.height - gate.gapBottom);
+
+                    // Forgiving hitboxes
+                    let forgiveness = 6; 
+                    if (gate.x < this.player.x + (this.player.size - forgiveness) && 
+                        gate.x + gate.w > this.player.x - (this.player.size - forgiveness)) {
+                        
+                        if (this.player.y - (this.player.size - forgiveness) < gate.gapTop || 
+                            this.player.y + (this.player.size - forgiveness) > gate.gapBottom) {
+                            this.ctx.shadowBlur = 0;
+                            this.end();
+                            return;
+                        }
+                    }
+
+                    if (!gate.passed && gate.x + gate.w < this.player.x) {
+                        gate.passed = true;
+                        this.score++;
+                        document.getElementById('score-val').textContent = this.score;
+                    }
+
+                    if (gate.x + gate.w < 0) {
+                        this.gates.splice(i, 1);
+                    }
+                }
+
+                this.ctx.fillStyle = '#06b6d4'; 
+                this.ctx.shadowBlur = 20;
+                this.ctx.shadowColor = '#06b6d4';
+                
+                this.ctx.beginPath();
+                this.ctx.arc(this.player.x, this.player.y, this.player.size, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.player.x - this.player.size, this.player.y);
+                this.ctx.lineTo(this.player.x - 40, this.player.y);
+                this.ctx.strokeStyle = 'rgba(6, 182, 212, 0.5)';
+                this.ctx.lineWidth = 4;
+                this.ctx.stroke();
+
+                this.ctx.shadowBlur = 0; 
+            }
+        };
+
+        const ChartManager = {
+            chart: null,
+            init() {
+                const ctx = document.getElementById('romChart').getContext('2d');
+                Chart.defaults.color = '#94a3b8';
+                Chart.defaults.font.family = 'Inter';
+                
+                this.chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: [], datasets: [{
+                            label: 'Max Flexion (°)', data: [],
+                            borderColor: '#8b5cf6', backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                            borderWidth: 2, tension: 0.4, fill: true,
+                            pointBackgroundColor: '#06b6d4', pointRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' }, min: 0, max: 90 }, x: { grid: { display: false } } }
+                    }
+                });
+
+                for(let i=1; i<=10; i++) this.addPoint(i, Math.floor(Math.random() * 20) + 30);
+            },
+            addPoint(repNumber, romValue) {
+                if(!this.chart) return;
+                this.chart.data.labels.push('Rep ' + repNumber);
+                this.chart.data.datasets[0].data.push(romValue);
+                if(this.chart.data.labels.length > 15) {
+                    this.chart.data.labels.shift();
+                    this.chart.data.datasets[0].data.shift();
+                }
+                this.chart.update();
+            }
+        };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            UIManager.init();
+            ThreeManager.init();
+            GameManager.init();
+            ChartManager.init();
+            HardwareManager.init();
+            BiomechanicsManager.init();
+            WSManager.init();
+        });
+    </script>
+</body>
+</html>
