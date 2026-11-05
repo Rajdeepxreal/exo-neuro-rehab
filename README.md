@@ -89,4 +89,4 @@ ESP32 (Arduino), MPU6050, WebSockets, ArduinoJson, ESP32Servo. Browser: Three.js
 
 ## License
 
-MIT. Add a `LICENSE` file with the MIT text before publishing.
+MIT.
